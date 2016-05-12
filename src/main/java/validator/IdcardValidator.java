@@ -72,7 +72,7 @@ public class IdcardValidator {
 	 */
 	private static String convert15Bit217Bit(String idcard) {
 		String birthdayStr = idcard.substring(6, 12);
-		Date birthday = null;
+		Date birthday;
 		try {
 			birthday = FastDateFormat.getInstance("yyMMdd").parse(birthdayStr);
 		} catch (ParseException e) {
@@ -90,11 +90,7 @@ public class IdcardValidator {
 	 * @return
 	 */
 	private static boolean isValidate18Idcard(String idcard) {
-		// 非18位为假
-		if (idcard.length() != 18) {
-			return false;
-		}
-		return validateCityCode(idcard) && validateBirthday(idcard) && validateCheckCode(idcard);
+		return idcard.length() == 18 && validateCityCode(idcard) && validateBirthday(idcard) && validateCheckCode(idcard);
 	}
 
 	/**
