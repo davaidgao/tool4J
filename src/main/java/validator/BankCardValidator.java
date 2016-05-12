@@ -1,6 +1,6 @@
 package validator;
 
-import util.StringUtilsExtend;
+import lang.util.StringUtils;
 
 /**
  * 银行卡卡号校验器
@@ -15,7 +15,7 @@ import util.StringUtilsExtend;
  */
 public class BankCardValidator {
 	public static boolean validate(String bankCard) {
-        if(StringUtilsExtend.isNotNumeric(bankCard)) {
+        if(StringUtils.isNotNumeric(bankCard)) {
             return false;
         }
 		char checkCode = getCheckCode(bankCard);

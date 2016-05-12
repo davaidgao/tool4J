@@ -6,11 +6,9 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.FastDateFormat;
 
-import util.StringUtilsExtend;
-
+import lang.util.StringUtils;
 
 /**
  * 
@@ -136,7 +134,7 @@ public class IdcardValidator {
 	private static boolean validateCheckCode(String idcard) {
 		// 获取前17位
 		String idcard17 = idcard.substring(0, 17);
-		if(StringUtilsExtend.isNotNumeric(idcard17)){
+		if(StringUtils.isNotNumeric(idcard17)){
 			return false;
 		}
 		// 生成第18位校验码
