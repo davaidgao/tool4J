@@ -1,14 +1,10 @@
 package com.gdwii.validator;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.time.LocalDate;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 
 import com.gdwii.util.StringUtils;
-import com.gdwii.util.time.DateTimeUtil;
+import com.gdwii.util.time.DateTimeParser;
 
 
 /**
@@ -67,14 +63,12 @@ public class IdcardValidator {
 	
 	/**
 	 * 将15位转为17位
-	 * 
-	 * @param idcard
+	 * 即将idcard的前6位后补19年份
+	 * @param idcard 15位身份证
 	 * @return
 	 */
 	private static String convert15Bit217Bit(String idcard) {
-		String birthdayStr = idcard.substring(6, 12);
-		LocalDate birthday = DateTimeUtil.parseDate(birthdayStr);
-		return idcard.substring(0, 6) + birthday.getYear() + idcard.substring(8);
+		return idcard.substring(0, 6) + "19" + idcard.substring(6);
 	}
 	
 	/**
@@ -105,18 +99,9 @@ public class IdcardValidator {
 	 * @return
 	 */
 	private static boolean validateBirthday(String idcard) {
-		Date birthday = getBirthday(idcard);
+		String birthdayString = idcard.substring(6, 14);
+		Date birthday = DateTimeParser.parseDateStrictly(birthdayString, "yyyyMMdd");
 		return birthday != null && birthday.before(new Date());
-	}
-	
-	private static Date getBirthday(String idcard){
-		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd");
-		dateFormat.setLenient(false);
-		try {
-			return dateFormat.parse(idcard.substring(6, 14));
-		} catch (ParseException e) {
-			return null;
-		}
 	}
 	
 	/**

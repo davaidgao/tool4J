@@ -1,7 +1,7 @@
 package com.gdwii.util;
 
 /**
- *
+ * 字符串辅助方法
  * @author gdw
  * @since 1.0
  *
@@ -31,6 +31,4 @@ public abstract class StringUtils {
     public static boolean isNotNumeric(CharSequence cs){
 		return !isNumeric(cs);
 	}
-
-
 }

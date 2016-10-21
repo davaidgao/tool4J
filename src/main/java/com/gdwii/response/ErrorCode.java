@@ -21,7 +21,7 @@ public interface ErrorCode {
      * @param extraInfos 额外补充信息
      * @return 完整的描述信息
      */
-    default String msg(String ... extraInfos){
+    default String msg(Object ... extraInfos){
         return String.format(msg(), extraInfos);
     }
 }

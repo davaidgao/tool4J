@@ -1,6 +1,9 @@
 package com.gdwii.validator;
 
 import org.junit.Test;
+
+import com.gdwii.util.text.ParseRuntimeException;
+
 import static org.junit.Assert.*;
 
 public class IdcardValidatorTest {
@@ -10,7 +13,7 @@ public class IdcardValidatorTest {
 		assertFalse(IdcardValidator.validate(idcard17 + IdcardValidator.getCheckCode(idcard17)));
 	}
 	
-	@Test
+	@Test(expected=ParseRuntimeException.class)
 	public void falseDate(){
 		String idcard17 = "342401" + "19900466" + "234";
 		assertFalse(IdcardValidator.validate(idcard17 + IdcardValidator.getCheckCode(idcard17)));
@@ -36,6 +39,7 @@ public class IdcardValidatorTest {
 	
 	@Test
 	public void true15Idcard(){
-		assertTrue(IdcardValidator.validate("342401900714192"));
+		// 421022198810064529
+		assertTrue(IdcardValidator.validate("421022881006452"));
 	}
 }

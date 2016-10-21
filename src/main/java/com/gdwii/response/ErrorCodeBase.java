@@ -1,7 +1,5 @@
 package com.gdwii.response;
 
-import java.io.Serializable;
-
 /**
  * 基本的错误编码
  */
@@ -22,11 +20,11 @@ public enum ErrorCodeBase implements ErrorCode{
 
     @Override
     public int code() {
-        return 0;
+        return code;
     }
 
     @Override
     public String msg() {
-        return null;
+        return msg;
     }
 }

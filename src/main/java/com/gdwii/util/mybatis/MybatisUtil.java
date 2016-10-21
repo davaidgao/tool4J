@@ -9,7 +9,7 @@ public class MybatisUtil {
     private static SqlSessionFactory sqlSessionFactory;
 
     public MybatisUtil(SqlSessionFactory sqlSessionFactory) {
-        this.sqlSessionFactory = sqlSessionFactory;
+    	MybatisUtil.sqlSessionFactory = sqlSessionFactory;
     }
 
     public static <T,G> void batchOperator(MybatisOperator<T,G> operator, Class<T> mapperClass, List<G> values){
