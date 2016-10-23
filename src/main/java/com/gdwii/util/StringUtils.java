@@ -20,7 +20,14 @@ public abstract class StringUtils {
             return false;
         }
         final int sz = cs.length();
-        for (int i = 0; i < sz; i++) {
+        int i = cs.charAt(0) == '+'  || cs.charAt(0) == '-' ? 1 : 0; // 包括正负号
+
+        if(i == sz){ // 只有正负号则不认为是数字
+            return false;
+        }
+
+        // 从i开始递增处理
+        for (; i < sz; i++) {
             if (!Character.isDigit(cs.charAt(i))) {
                 return false;
             }
