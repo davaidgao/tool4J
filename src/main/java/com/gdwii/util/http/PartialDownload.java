@@ -1,15 +1,15 @@
 package com.gdwii.util.http;
 
-import com.gdwii.util.StringUtils;
-
-import java.io.*;
-import java.text.ParseException;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import static com.sun.corba.se.impl.activation.CommandHandler.parseError;
-import static com.sun.xml.internal.bind.WhiteSpaceProcessor.replace;
+import com.gdwii.util.StringUtils;
 
 /**
  * 分段下载实现
@@ -21,7 +21,7 @@ import static com.sun.xml.internal.bind.WhiteSpaceProcessor.replace;
  * @author gdwii
  *
  */
-public class RangetDownloadUtil {
+public class PartialDownload {
 	private HttpServletRequest request;
 	private HttpServletResponse response;
 	private File file;
@@ -37,17 +37,17 @@ public class RangetDownloadUtil {
 	 */
 	private long end;
 	
-	public RangetDownloadUtil(HttpServletRequest request, HttpServletResponse response, File file) {
+	public PartialDownload(HttpServletRequest request, HttpServletResponse response, File file) {
 		this.request = request;
 		this.response = response;
 		this.file = file;
 		totalSize = file.length();
 	}
 
-
 	public void download(){
 		processRange(request.getHeader("Range")); // Range表示从哪个位置开始下载
 		// 设置头消息
+		response.setHeader("Accept-Ranges", "bytes"); // 该消息头表示下载支持分块下载;没有该消息则不知处分块下载
 		response.setContentType("application/octet-stream");
 		response.setHeader("Content-Length", String.valueOf(end - start + 1));
 		response.addHeader( "Content-Disposition", "attachment;filename=\"" + HttpResponeUtil.downloadFileNameProcess(file.getName(), request)  + "\"");
@@ -56,23 +56,18 @@ public class RangetDownloadUtil {
 	}
 
 	private void copyData() {
-		BufferedInputStream in = null;
+		InputStream in = null;
 		OutputStream out = null;
 		try{
-			in = new BufferedInputStream(new FileInputStream(file));
+			in = new FileInputStream(file);
 			in.skip(start);
 			out = response.getOutputStream();
 
-			byte[] b = new byte[1024];
+			byte[] b = new byte[8192];
 			int len;
 			while((len = in.read(b)) > 0){
 				out.write(b, 0, len);
 				out.flush();
-				try {
-					Thread.sleep(2000);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
 			}
 		}catch (IOException e){
 			throw new RuntimeException(e);
@@ -161,7 +156,6 @@ public class RangetDownloadUtil {
          * 		Content-Range: bytes 0-10/3103
          * 这个表示，服务器响应了前(0-10)个字节的数据，该资源一共有(3103)个字节大小。
          */
-		response.setHeader("Accept-Ranges", "bytes");
 		String contentRange = new StringBuilder("bytes ").append(start).append("-").append(end).append("/").append(totalSize).toString();
 		response.setHeader("Content-Range", contentRange);
 		response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
