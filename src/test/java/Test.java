@@ -17,7 +17,7 @@ public class Test {
 		String somevalue = "somevalue"; 
 		byte[] salt = "sdsdsdsds".getBytes();
 		String encrypted1 = "CBBD894920DCCB122B79BF15B583961E22C5662C";// DatatypeConverter.printHexBinary(getEncryptedPassword(somevalue, salt));
-		String encrypted2 = DatatypeConverter.printHexBinary(getEncryptedPassword(somevalue, salt));
+		String encrypted2 = javax.xml.bind.DatatypeConverter.printBase64Binary(getEncryptedPassword(somevalue, salt));
 		System.out.println(encrypted2); 
 		
 		System.out.println(encrypted1.equals(encrypted2));
