@@ -21,8 +21,4 @@ public abstract class MD5Util {
 			throw new InternalError("MD5 not supported", nsae);
 		}
 	}
-	
-	public static void main(String[] args) {
-		System.out.println(digest("123456"));
-	}
 }

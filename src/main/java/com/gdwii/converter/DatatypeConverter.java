@@ -1,5 +1,9 @@
 package com.gdwii.converter;
 
+/**
+ * 数据类型转换
+ * 是jdk的 javax.xml.bind.DatatypeConverter的模拟
+ */
 public class DatatypeConverter {
 	private static final char[] hexCode = "0123456789ABCDEF".toCharArray();
 	
