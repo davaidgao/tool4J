@@ -2,19 +2,16 @@ package com.gdwii.tool4j.chain.impl;
 
 
 import com.gdwii.tool4j.chain.Context;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.beans.IntrospectionException;
 import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
 import java.lang.reflect.Method;
-import java.util.AbstractCollection;
-import java.util.AbstractSet;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
-import java.io.Serializable;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 
 /**
@@ -32,24 +29,13 @@ import java.io.Serializable;
  * be utilized as an attribute key or property name.</p>
  */
 public class ContextBase implements Context {
-
-
-
-
+    private static final Logger logger = LoggerFactory.getLogger(ContextBase.class);
 
 // ------------------------------------------------------------ Constructors
-
-
     /**
      * Default, no argument constructor.
      */
-    public ContextBase() {
-
-        super();
-        initialize();
-
-    }
-
+    public ContextBase() {}
 
     /**
      * <p>Initialize the contents of this {@link Context} by copying the
@@ -64,12 +50,8 @@ public class ContextBase implements Context {
      * @exception UnsupportedOperationException if a local property does not
      *  have a write method.
      */
-    public ContextBase(Map map) {
-
-        super(map);
-        initialize();
+    public ContextBase(Map<String, Object> map) {
         putAll(map);
-
     }
 
 
@@ -77,7 +59,7 @@ public class ContextBase implements Context {
     /**
      * internal container to store info except JavaBeans properties
      */
-    private Map<String, Object> internalContainer;
+    private Map<String, Object> internalContainer = EMPTY_MAP;
 
     /**
      * <p>The <code>PropertyDescriptor</code>s for all JavaBeans properties
@@ -85,14 +67,19 @@ public class ContextBase implements Context {
      * This collection is allocated only if there are any JavaBeans
      * properties.</p>
      */
-    private static Map<Class, Map<String, PropertyDescriptor>> propertyDescriptorContainer = new HashMap<>();
+    private Map<String, PropertyDescriptor> propertyDescriptors = createPropertyDescriptors();
 
     /**
      * <p>Zero-length array of parameter values for calling property getters.
      * </p>
      */
-    private static Object[] zeroParams = new Object[0];
+    private static final Object[] zeroParams = new Object[0];
 
+    /**
+     * <p>Zero-length array of parameter values for calling property getters.
+     * </p>
+     */
+    private static final Map<String, Object> EMPTY_MAP = Collections.emptyMap();
 
     // ------------------------------------------------------------- Map Methods
     /**
@@ -100,19 +87,7 @@ public class ContextBase implements Context {
      * values except those corresponding to JavaBeans properties.</p>
      */
     public void clear() {
-
-        if (descriptors == null) {
-            super.clear();
-        } else {
-            Iterator keys = keySet().iterator();
-            while (keys.hasNext()) {
-                Object key = keys.next();
-                if (!descriptors.containsKey(key)) {
-                    keys.remove();
-                }
-            }
-        }
-
+        internalContainer.clear();
     }
 
 
@@ -128,32 +103,21 @@ public class ContextBase implements Context {
      *  throws an exception
      */
     public boolean containsValue(Object value) {
-
-        // Case 1 -- no local properties
-        if (descriptors == null) {
-            return (super.containsValue(value));
+        // Case 1 -- value found in the underlying Map
+        if (internalContainer.containsValue(value)) {
+            return true;
         }
 
-        // Case 2 -- value found in the underlying Map
-        else if (super.containsValue(value)) {
-            return (true);
-        }
-
-        // Case 3 -- check the values of our readable properties
-        for (int i = 0; i < pd.length; i++) {
-            if (pd[i].getReadMethod() != null) {
-                Object prop = readProperty(pd[i]);
-                if (value == null) {
-                    if (prop == null) {
-                        return (true);
+        // Case 2 -- check the values of our readable properties
+        return propertyDescriptors.entrySet().stream()
+                .anyMatch(entry -> {
+                    PropertyDescriptor propertyDescriptor = entry.getValue();
+                    if (propertyDescriptor.getReadMethod() != null) {
+                        Object prop = readProperty(propertyDescriptor);
+                        return Objects.equals(value, prop);
                     }
-                } else if (value.equals(prop)) {
-                    return (true);
-                }
-            }
-        }
-        return (false);
-
+                    return false;
+                });
     }
 
 
@@ -166,12 +130,13 @@ public class ContextBase implements Context {
      *
      * @return Set of entries in the Context.
      */
-    public Set entrySet() {
-
-        return (new EntrySetImpl());
-
+    public Set<Map.Entry<String, Object>> entrySet() {
+        Set<Map.Entry<String, Object>> entrySet = new HashSet<>();
+        for(String key : keySet()){
+            entrySet.add(new MapEntryImpl(key, get(key)));
+        }
+        return entrySet;
     }
-
 
     /**
      * <p>Override the default <code>Map</code> behavior to return the value
@@ -192,30 +157,29 @@ public class ContextBase implements Context {
      *  have a read method.
      */
     public Object get(Object key) {
-
-        // Case 1 -- no local properties
-        if (descriptors == null) {
-            return (super.get(key));
+        if(key == null){
+            return null;
         }
 
-        // Case 2 -- this is a local property
-        if (key != null) {
-            PropertyDescriptor descriptor =
-                    (PropertyDescriptor) descriptors.get(key);
-            if (descriptor != null) {
-                if (descriptor.getReadMethod() != null) {
-                    return (readProperty(descriptor));
-                } else {
-                    return (null);
-                }
+        // Case 1 -- this is a local property
+        PropertyDescriptor descriptor = propertyDescriptors.get(key);
+        if (descriptor != null) {
+            if (descriptor.getReadMethod() != null) {
+                return readProperty(descriptor);
+            } else {
+                return null;
             }
         }
 
-        // Case 3 -- retrieve value from our underlying Map
-        return (super.get(key));
-
+        // Case 2 -- retrieve value from our underlying Map
+        return internalContainer.get(key);
     }
 
+
+    @Override
+    public int size() {
+        return propertyDescriptors.size() + internalContainer.size();
+    }
 
     /**
      * <p>Override the default <code>Map</code> behavior to return
@@ -226,15 +190,12 @@ public class ContextBase implements Context {
      *  <code>false</code>.
      */
     public boolean isEmpty() {
+        return propertyDescriptors.isEmpty() && internalContainer.isEmpty();
+    }
 
-        // Case 1 -- no local properties
-        if (descriptors == null) {
-            return (super.isEmpty());
-        }
-
-        // Case 2 -- compare key count to property count
-        return (super.size() <= descriptors.size());
-
+    @Override
+    public boolean containsKey(Object key) {
+        return propertyDescriptors.containsKey(key) || internalContainer.containsKey(key);
     }
 
 
@@ -247,11 +208,11 @@ public class ContextBase implements Context {
      *
      * @return The set of keys for objects in this Context.
      */
-    public Set keySet() {
-
-
-        return (super.keySet());
-
+    public Set<String> keySet() {
+        Set<String> keySet = new HashSet<>();
+        keySet.addAll(propertyDescriptors.keySet());
+        keySet.addAll(internalContainer.keySet());
+        return keySet;
     }
 
 
@@ -269,32 +230,27 @@ public class ContextBase implements Context {
      * @exception UnsupportedOperationException if this local property does not
      *  have both a read method and a write method
      */
-    public Object put(Object key, Object value) {
-
+    public Object put(String key, Object value) {
         // Case 1 -- no local properties
-        if (descriptors == null) {
-            return (super.put(key, value));
+        if (key == null) {
+            throw new IllegalArgumentException("key is not null");
         }
 
         // Case 2 -- this is a local property
-        if (key != null) {
-            PropertyDescriptor descriptor =
-                    (PropertyDescriptor) descriptors.get(key);
-            if (descriptor != null) {
-                Object previous = null;
-                if (descriptor.getReadMethod() != null) {
-                    previous = readProperty(descriptor);
-                }
-                writeProperty(descriptor, value);
-                return (previous);
+        PropertyDescriptor descriptor = propertyDescriptors.get(key);
+        if (descriptor != null) {
+            Object previous = null;
+            if (descriptor.getReadMethod() != null) {
+                previous = readProperty(descriptor);
             }
+            writeProperty(descriptor, value);
+            return previous;
         }
 
         // Case 3 -- store or replace value in our underlying map
-        return (super.put(key, value));
-
+        Map<String, Object> internalContainer = ensureInternalContainer();
+        return internalContainer.put(key, value);
     }
-
 
     /**
      * <p>Override the default <code>Map</code> behavior to call the
@@ -309,14 +265,8 @@ public class ContextBase implements Context {
      * @exception UnsupportedOperationException if a local property does not
      *  have both a read method and a write method
      */
-    public void putAll(Map map) {
-
-        Iterator pairs = map.entrySet().iterator();
-        while (pairs.hasNext()) {
-            Map.Entry pair = (Map.Entry) pairs.next();
-            put(pair.getKey(), pair.getValue());
-        }
-
+    public void putAll(Map<? extends String, ?> map) {
+        map.forEach((key, value) -> put(key, value));
     }
 
 
@@ -332,25 +282,18 @@ public class ContextBase implements Context {
      *  <code>key</code> matches the name of a local property
      */
     public Object remove(Object key) {
-
-        // Case 1 -- no local properties
-        if (descriptors == null) {
-            return (super.remove(key));
+        if (key == null) {
+            throw new IllegalArgumentException("key is not null");
         }
 
-        // Case 2 -- this is a local property
-        if (key != null) {
-            PropertyDescriptor descriptor =
-                    (PropertyDescriptor) descriptors.get(key);
-            if (descriptor != null) {
+        // Case 1 -- this is a local property
+        if (propertyDescriptors.containsKey(key)) {
                 throw new UnsupportedOperationException
                         ("Local property '" + key + "' cannot be removed");
-            }
         }
 
-        // Case 3 -- remove from underlying Map
-        return (super.remove(key));
-
+        // Case 2 -- remove from underlying Map
+        return internalContainer.remove(key);
     }
 
 
@@ -363,79 +306,41 @@ public class ContextBase implements Context {
      *
      * @return The collection of values in this Context.
      */
-    public Collection values() {
-
-        return (new ValuesImpl());
-
+    public Collection<Object> values() {
+        throw new UnsupportedOperationException("values unsupported");
     }
 
 
     // --------------------------------------------------------- Private Methods
 
-
-    /**
-     * <p>Return an <code>Iterator</code> over the set of <code>Map.Entry</code>
-     * objects representing our key-value pairs.</p>
-     */
-    private Iterator entriesIterator() {
-
-        return (new EntrySetIterator());
-
-    }
-
-
-    /**
-     * <p>Return a <code>Map.Entry</code> for the specified key value, if it
-     * is present; otherwise, return <code>null</code>.</p>
-     *
-     * @param key Attribute key or property name
-     */
-    private Map.Entry entry(Object key) {
-
-        if (containsKey(key)) {
-            return (new MapEntryImpl(key, get(key)));
-        } else {
-            return (null);
+    private Map<String, Object> ensureInternalContainer() {
+        Map<String, Object> internalContainer = this.internalContainer;
+        if(internalContainer == EMPTY_MAP){
+            internalContainer = new HashMap<>();
+            this.internalContainer = internalContainer;
         }
-
+        return internalContainer;
     }
 
-
-    /**
-     * <p>Customize the contents of our underlying <code>Map</code> so that
-     * it contains keys corresponding to all of the JavaBeans properties of
-     * the {@link Context} implementation class.</p>
-     *
-     *
-     * @exception IllegalArgumentException if an exception is thrown
-     *  writing this local property value
-     * @exception UnsupportedOperationException if this local property does not
-     *  have a write method.
-     */
-    private void initialize() {
+    private Map<String, PropertyDescriptor> createPropertyDescriptors() {
+        if(ContextBase.class.equals(getClass())){
+            return Collections.emptyMap();
+        }
 
         // Retrieve the set of property descriptors for this Context class
         try {
-            pd = Introspector.getBeanInfo
-                    (getClass()).getPropertyDescriptors();
+            PropertyDescriptor[] pds = Introspector.getBeanInfo
+                    (getClass()).getPropertyDescriptors(); // 由于内部有缓存,性能有一定的保证
+            return Arrays.stream(pds)
+                    .filter(pd -> {
+                        String name = pd.getName();
+                        return !("class".equals(name) || "empty".equals(name));
+                    }) // Add descriptor (ignoring getClass() and isEmpty())
+                    .collect(Collectors.toMap(PropertyDescriptor::getName, Function.identity()));
         } catch (IntrospectionException e) {
-            pd = new PropertyDescriptor[0]; // Should never happen
+            logger.warn("class:{} could not introspect", getClass(), e);
+            return Collections.emptyMap();
         }
-
-        // Initialize the underlying Map contents
-        for (int i = 0; i < pd.length; i++) {
-            String name = pd[i].getName();
-
-            // Add descriptor (ignoring getClass() and isEmpty())
-            if (!("class".equals(name) || "empty".equals(name))) {
-                if (descriptors == null) {
-                    descriptors = new HashMap((pd.length - 2));
-                }
-                descriptors.put(name, pd[i]);
-                super.put(name, singleton);
-            }
-        }
-
     }
 
 
@@ -468,43 +373,6 @@ public class ContextBase implements Context {
 
     }
 
-
-    /**
-     * <p>Remove the specified key-value pair, if it exists, and return
-     * <code>true</code>.  If this pair does not exist, return
-     * <code>false</code>.</p>
-     *
-     * @param entry Key-value pair to be removed
-     *
-     * @exception UnsupportedOperationException if the specified key
-     *  identifies a property instead of an attribute
-     */
-    private boolean remove(Map.Entry entry) {
-
-        Map.Entry actual = entry(entry.getKey());
-        if (actual == null) {
-            return (false);
-        } else if (!entry.equals(actual)) {
-            return (false);
-        } else {
-            remove(entry.getKey());
-            return (true);
-        }
-
-    }
-
-
-    /**
-     * <p>Return an <code>Iterator</code> over the set of values in this
-     * <code>Map</code>.</p>
-     */
-    private Iterator valuesIterator() {
-
-        return (new ValuesIterator());
-
-    }
-
-
     /**
      * <p>Set the value for the specified property.</p>
      *
@@ -527,102 +395,26 @@ public class ContextBase implements Context {
                         ("Property '" + descriptor.getName()
                                 + "' is not writeable");
             }
-            method.invoke(this, new Object[] {value});
+            method.invoke(this, value);
         } catch (Exception e) {
             throw new UnsupportedOperationException
                     ("Exception writing property '" + descriptor.getName()
                             + "': " + e.getMessage());
         }
-
     }
-
 
     // --------------------------------------------------------- Private Classes
-
-
-    /**
-     * <p>Private implementation of <code>Set</code> that implements the
-     * semantics required for the value returned by <code>entrySet()</code>.</p>
-     */
-    private class EntrySetImpl extends AbstractSet {
-
-        public void clear() {
-            ContextBase.this.clear();
-        }
-
-        public boolean contains(Object obj) {
-            if (!(obj instanceof Map.Entry)) {
-                return (false);
-            }
-            Map.Entry entry = (Map.Entry) obj;
-            Entry actual = ContextBase.this.entry(entry.getKey());
-            if (actual != null) {
-                return (actual.equals(entry));
-            } else {
-                return (false);
-            }
-        }
-
-        public boolean isEmpty() {
-            return (ContextBase.this.isEmpty());
-        }
-
-        public Iterator iterator() {
-            return (ContextBase.this.entriesIterator());
-        }
-
-        public boolean remove(Object obj) {
-            if (obj instanceof Map.Entry) {
-                return (ContextBase.this.remove((Map.Entry) obj));
-            } else {
-                return (false);
-            }
-        }
-
-        public int size() {
-            return (ContextBase.this.size());
-        }
-
-    }
-
-
-    /**
-     * <p>Private implementation of <code>Iterator</code> for the
-     * <code>Set</code> returned by <code>entrySet()</code>.</p>
-     */
-    private class EntrySetIterator implements Iterator {
-
-        private Map.Entry entry = null;
-        private Iterator keys = ContextBase.this.keySet().iterator();
-
-        public boolean hasNext() {
-            return (keys.hasNext());
-        }
-
-        public Object next() {
-            entry = ContextBase.this.entry(keys.next());
-            return (entry);
-        }
-
-        public void remove() {
-            ContextBase.this.remove(entry);
-        }
-
-    }
-
-
     /**
      * <p>Private implementation of <code>Map.Entry</code> for each item in
      * <code>EntrySetImpl</code>.</p>
      */
-    private class MapEntryImpl implements Map.Entry {
-
-        MapEntryImpl(Object key, Object value) {
+    private class MapEntryImpl implements Map.Entry<String, Object> {
+        MapEntryImpl(String key, Object value) {
             this.key = key;
             this.value = value;
         }
 
-        private Object key;
+        private String key;
         private Object value;
 
         public boolean equals(Object obj) {
@@ -646,12 +438,12 @@ public class ContextBase implements Context {
             }
         }
 
-        public Object getKey() {
-            return (this.key);
+        public String getKey() {
+            return this.key;
         }
 
         public Object getValue() {
-            return (this.value);
+            return this.value;
         }
 
         public int hashCode() {
@@ -663,77 +455,11 @@ public class ContextBase implements Context {
             Object previous = this.value;
             ContextBase.this.put(this.key, value);
             this.value = value;
-            return (previous);
+            return previous;
         }
 
         public String toString() {
             return getKey() + "=" + getValue();
         }
-    }
-
-
-    /**
-     * <p>Private implementation of <code>Collection</code> that implements the
-     * semantics required for the value returned by <code>values()</code>.</p>
-     */
-    private class ValuesImpl extends AbstractCollection {
-
-        public void clear() {
-            ContextBase.this.clear();
-        }
-
-        public boolean contains(Object obj) {
-            if (!(obj instanceof Map.Entry)) {
-                return (false);
-            }
-            Map.Entry entry = (Map.Entry) obj;
-            return (ContextBase.this.containsValue(entry.getValue()));
-        }
-
-        public boolean isEmpty() {
-            return (ContextBase.this.isEmpty());
-        }
-
-        public Iterator iterator() {
-            return (ContextBase.this.valuesIterator());
-        }
-
-        public boolean remove(Object obj) {
-            if (obj instanceof Map.Entry) {
-                return (ContextBase.this.remove((Map.Entry) obj));
-            } else {
-                return (false);
-            }
-        }
-
-        public int size() {
-            return (ContextBase.this.size());
-        }
-
-    }
-
-
-    /**
-     * <p>Private implementation of <code>Iterator</code> for the
-     * <code>Collection</code> returned by <code>values()</code>.</p>
-     */
-    private class ValuesIterator implements Iterator {
-
-        private Map.Entry entry = null;
-        private Iterator keys = ContextBase.this.keySet().iterator();
-
-        public boolean hasNext() {
-            return (keys.hasNext());
-        }
-
-        public Object next() {
-            entry = ContextBase.this.entry(keys.next());
-            return (entry.getValue());
-        }
-
-        public void remove() {
-            ContextBase.this.remove(entry);
-        }
-
     }
 }
